@@ -20,4 +20,12 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ResponseDto(message))
     }
+
+    @ExceptionHandler(UniqueHashGenerationException::class)
+    fun handleUniqueHashGeneration(ex: UniqueHashGenerationException): ResponseEntity<ResponseDto> {
+        val message = ex.message ?: "Failed to generate unique short URL"
+        log.error(message, ex)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ResponseDto(message))
+    }
 }
