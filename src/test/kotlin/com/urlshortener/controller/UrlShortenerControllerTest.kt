@@ -1,5 +1,6 @@
 package com.urlshortener.controller
 
+import com.urlshortener.constants.Constants.DOMAIN
 import com.urlshortener.model.UrlDocument
 import com.urlshortener.repository.StorageRepository
 import com.urlshortener.service.UrlShortener
@@ -14,9 +15,9 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 
 class UrlShortenerControllerTest {
 
@@ -43,7 +44,7 @@ class UrlShortenerControllerTest {
     fun `POST shortenUrl should return CREATED with short URL for valid URL`() {
         val originalUrl = "https://example.com"
         val shortCode = "abc123"
-        val shortUrl = "https://short.ly/$shortCode"
+        val shortUrl = "$DOMAIN$shortCode"
 
         whenever(mockStorage.findUrlDocumentByLongUrl(originalUrl)).thenReturn(null)
         whenever(mockStorage.save(UrlDocument(shortUrl = shortCode, longUrl = originalUrl, createdAt = Instant.now())))
@@ -51,11 +52,11 @@ class UrlShortenerControllerTest {
 
         mockMvc.perform(
             post("/api/shorten")
-                .contentType(MediaType.TEXT_PLAIN)
-                .content(originalUrl)
+                .param("originalUrl", originalUrl)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
         )
             .andExpect(status().isCreated)
-            .andExpect(content().string(shortUrl))
+            .andExpect(jsonPath("$.data").value(shortUrl))
     }
 
     @Test
@@ -64,17 +65,17 @@ class UrlShortenerControllerTest {
 
         mockMvc.perform(
             post("/api/shorten")
-                .contentType(MediaType.TEXT_PLAIN)
-                .content(invalidUrl)
+                .param("originalUrl", invalidUrl)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
         )
             .andExpect(status().isBadRequest)
-            .andExpect(content().string("Invalid url:$invalidUrl"))
+            .andExpect(jsonPath("$.data").value("Invalid url:$invalidUrl"))
     }
 
     @Test
     fun `GET retrieveUrl should return original URL when found for valid URL`() {
         val shortCode = "abc123"
-        val shortUrl = "https://short.ly/$shortCode"
+        val shortUrl = "$DOMAIN$shortCode"
         val originalUrl = "https://example.com"
 
         whenever(mockStorage.findUrlDocumentByShortUrl(shortCode))
@@ -85,12 +86,12 @@ class UrlShortenerControllerTest {
                 .param("shortUrl", shortUrl)
         )
             .andExpect(status().isOk)
-            .andExpect(content().string(originalUrl))
+            .andExpect(jsonPath("$.data").value(originalUrl))
     }
 
     @Test
     fun `GET retrieveUrl should return NOT_FOUND when short URL not found`() {
-        val shortUrl = "https://short.ly/unknown"
+        val shortUrl = DOMAIN + "unknown"
         val shortCode = "unknown"
 
         whenever(mockStorage.findUrlDocumentByShortUrl(shortCode)).thenReturn(null)
@@ -100,7 +101,7 @@ class UrlShortenerControllerTest {
                 .param("shortUrl", shortUrl)
         )
             .andExpect(status().isNotFound)
-            .andExpect(content().string("Short URL not found"))
+            .andExpect(jsonPath("$.data").value("Short URL not found"))
     }
 
     @Test
@@ -112,6 +113,6 @@ class UrlShortenerControllerTest {
                 .param("shortUrl", invalidShortUrl)
         )
             .andExpect(status().isBadRequest)
-            .andExpect(content().string("Invalid url:$invalidShortUrl"))
+            .andExpect(jsonPath("$.data").value("Invalid url:$invalidShortUrl"))
     }
 }
