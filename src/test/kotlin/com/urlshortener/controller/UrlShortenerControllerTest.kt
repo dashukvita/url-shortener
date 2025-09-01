@@ -28,10 +28,7 @@ class UrlShortenerControllerTest {
 
     @BeforeEach
     fun setup() {
-        urlShortener = UrlShortenerImpl(
-            generator = mockGenerator,
-            storageRepository = mockStorage
-        )
+        urlShortener = UrlShortenerImpl(generator = mockGenerator, cacheRepository = mock(), storageRepository = mockStorage)
 
         mockMvc = MockMvcBuilders
             .standaloneSetup(UrlShortenerController(urlShortener))

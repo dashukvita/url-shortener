@@ -3,6 +3,10 @@ spring:
     name: urlshortener
 
   data:
+    redis:
+      host: localhost
+      port: 6379
+
     mongodb:
       uri: mongodb://admin:secret@localhost:27017/library?authSource=admin
 

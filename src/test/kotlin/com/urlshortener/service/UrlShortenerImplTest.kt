@@ -1,85 +1,89 @@
 package com.urlshortener.service
 
 import com.urlshortener.constants.Constants.DOMAIN
+import com.urlshortener.constants.Constants.TTL
 import com.urlshortener.model.UrlDocument
 import com.urlshortener.repository.StorageRepository
-import com.urlshortener.service.hashGenerator.HashGeneratorImpl
+import com.urlshortener.repository.cache.CacheRepository
+import com.urlshortener.service.hashGenerator.HashGenerator
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.mock
-import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import java.time.Instant
 
 class UrlShortenerImplTest {
     private lateinit var urlShortener: UrlShortenerImpl
     private val mockStorage: StorageRepository = mock()
-    private val generator = HashGeneratorImpl()
+    private val mockCache: CacheRepository<String, String> = mock()
+    private val mockGenerator: HashGenerator = mock()
 
     @BeforeEach
     fun setUp() {
-        urlShortener = UrlShortenerImpl(generator, mockStorage)
+        urlShortener = UrlShortenerImpl(mockGenerator, mockCache, mockStorage)
     }
 
     @Test
     fun `shorten should return a short URL starting with domain`() {
         val originalUrl = "https://example.com"
-        whenever(mockStorage.findUrlDocumentByLongUrl(originalUrl)).thenReturn(null)
-        whenever(mockStorage.save(UrlDocument(shortUrl = "abc123", longUrl = originalUrl, createdAt = Instant.now())))
-            .thenAnswer { }
+        whenever(mockCache.getByValue(originalUrl)).thenReturn(null)
+        whenever(mockGenerator.encode(originalUrl)).thenReturn("abc123")
+        whenever(mockStorage.save(any<UrlDocument>())).thenAnswer { it.getArgument<UrlDocument>(0) }
 
         val shortUrl = urlShortener.shorten(originalUrl)
+
         assertNotNull(shortUrl)
         assertTrue(shortUrl.startsWith(DOMAIN))
+        assertEquals(DOMAIN + "abc123", shortUrl)
+        verify(mockCache).save("abc123", originalUrl, TTL)
     }
 
     @Test
-    fun `shorten should return the same short URL for the same original URL`() {
+    fun `shorten should return cached short URL if exists`() {
         val originalUrl = "https://example.com"
-        val doc = UrlDocument(shortUrl = "abc123", longUrl = originalUrl, createdAt = Instant.now())
-        whenever(mockStorage.findUrlDocumentByLongUrl(originalUrl)).thenReturn(doc)
+        whenever(mockCache.getByValue(originalUrl)).thenReturn("abc123")
 
-        val shortUrl1 = urlShortener.shorten(originalUrl)
-        val shortUrl2 = urlShortener.shorten(originalUrl)
+        val shortUrl = urlShortener.shorten(originalUrl)
 
-        assertEquals(shortUrl1, shortUrl2)
+        assertEquals(DOMAIN + "abc123", shortUrl)
+        verify(mockGenerator, never()).encode(any())
+        verify(mockStorage, never()).save(any())
     }
 
     @Test
-    fun `retrieve should return original URL for given shortURL`() {
-        val shortCode = "abc123"
-        val shortUrl = DOMAIN + shortCode
-        val originalUrl = "https://example.com"
-        val doc = UrlDocument(shortUrl = shortCode, longUrl = originalUrl, createdAt = Instant.now())
-        whenever(mockStorage.findUrlDocumentByShortUrl(shortCode)).thenReturn(doc)
+    fun `retrieve should return original URL from cache`() {
+        val shortUrl = DOMAIN + "abc123"
+        whenever(mockCache.get("abc123")).thenReturn("https://example.com")
 
-        val retrieved = urlShortener.retrieve(shortUrl)
-        assertEquals(originalUrl, retrieved)
+        val originalUrl = urlShortener.retrieve(shortUrl)
+
+        assertEquals("https://example.com", originalUrl)
+        verify(mockStorage, never()).findUrlDocumentByShortUrl(any())
     }
 
     @Test
-    fun `retrieve should return null for unknown URL`() {
-        val unknownShortUrl = DOMAIN + "abcd"
-        whenever(mockStorage.findUrlDocumentByShortUrl("abcd")).thenReturn(null)
+    fun `retrieve should fetch from storage if cache misses`() {
+        val shortUrl = DOMAIN + "abc123"
+        whenever(mockCache.get("abc123")).thenReturn(null)
+        val doc = UrlDocument(shortUrl = "abc123", longUrl = "https://example.com", createdAt = Instant.now())
+        whenever(mockStorage.findUrlDocumentByShortUrl("abc123")).thenReturn(doc)
 
-        val retrieved = urlShortener.retrieve(unknownShortUrl)
-        assertNull(retrieved)
+        doNothing().`when`(mockCache).save("abc123", doc.longUrl, TTL)
+
+        val originalUrl = urlShortener.retrieve(shortUrl)
+
+        assertEquals(doc.longUrl, originalUrl)
+        verify(mockCache).save("abc123", doc.longUrl, TTL)
     }
 
     @Test
-    fun `shorten should generate unique codes for different URLs`() {
-        val url1 = "https://example.com/1"
-        val url2 = "https://example.com/2"
-        whenever(mockStorage.findUrlDocumentByLongUrl(url1)).thenReturn(null)
-        whenever(mockStorage.findUrlDocumentByLongUrl(url2)).thenReturn(null)
-        whenever(mockStorage.save(any<UrlDocument>())).thenAnswer { invocation ->
-            invocation.getArgument<UrlDocument>(0)
-        }
+    fun `retrieve should return null if not found`() {
+        val shortUrl = DOMAIN + "abc123"
+        whenever(mockCache.get("abc123")).thenReturn(null)
+        whenever(mockStorage.findUrlDocumentByShortUrl("abc123")).thenReturn(null)
 
-        val short1 = urlShortener.shorten(url1)
-        val short2 = urlShortener.shorten(url2)
+        val originalUrl = urlShortener.retrieve(shortUrl)
 
-        assertNotEquals(short1, short2)
+        assertNull(originalUrl)
     }
 }

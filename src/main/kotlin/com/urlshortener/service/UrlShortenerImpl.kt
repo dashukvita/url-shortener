@@ -2,8 +2,10 @@ package com.urlshortener.service
 
 import com.urlshortener.aspect.Loggable
 import com.urlshortener.constants.Constants.DOMAIN
+import com.urlshortener.constants.Constants.TTL
 import com.urlshortener.model.UrlDocument
 import com.urlshortener.repository.StorageRepository
+import com.urlshortener.repository.cache.CacheRepository
 import com.urlshortener.service.hashGenerator.HashGenerator
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -11,6 +13,7 @@ import java.time.Instant
 @Service
 class UrlShortenerImpl(
     val generator: HashGenerator,
+    private val cacheRepository: CacheRepository<String, String>,
     val storageRepository: StorageRepository
 ) : UrlShortener {
 
@@ -21,9 +24,9 @@ class UrlShortenerImpl(
      */
     @Loggable
     override fun shorten(originalUrl: String): String {
-        val existingDoc = storageRepository.findUrlDocumentByLongUrl(originalUrl)
-        if (existingDoc != null) {
-            return DOMAIN + existingDoc.shortUrl
+        // simple protection from double click
+        cacheRepository.getByValue(originalUrl)?.let { cached ->
+            return DOMAIN + cached
         }
 
         val shortCode = generator.encode(originalUrl)
@@ -33,6 +36,7 @@ class UrlShortenerImpl(
             createdAt = Instant.now()
         )
         storageRepository.save(doc)
+        cacheRepository.save(shortCode, originalUrl, TTL)
 
         return DOMAIN + shortCode
     }
@@ -45,7 +49,15 @@ class UrlShortenerImpl(
     @Loggable
     override fun retrieve(shortUrl: String): String? {
         val shortCode = shortUrl.removePrefix(DOMAIN)
-        val doc = storageRepository.findUrlDocumentByShortUrl(shortCode)
-        return doc?.longUrl
+
+        var originalUrl = cacheRepository.get(shortCode)
+        if (originalUrl == null) {
+            storageRepository.findUrlDocumentByShortUrl(shortCode)?.let { doc ->
+                originalUrl = doc.longUrl
+                cacheRepository.save(shortCode, originalUrl!!, TTL)
+            }
+        }
+
+        return originalUrl
     }
 }
