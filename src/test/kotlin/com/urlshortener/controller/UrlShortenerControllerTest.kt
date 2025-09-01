@@ -1,38 +1,41 @@
 package com.urlshortener.controller
 
 import com.urlshortener.service.UrlShortener
+import com.urlshortener.service.UrlShortenerImpl
+import com.urlshortener.service.hashGenerator.HashGenerator
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.boot.test.context.TestConfiguration
-import org.springframework.context.annotation.Bean
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(UrlShortenerController::class)
-class UrlShortenerControllerTest(
-    @Autowired private val mockMvc: MockMvc,
-    @Autowired private val urlShortener: UrlShortener
-) {
+class UrlShortenerControllerTest {
 
-    @TestConfiguration
-    class MockConfig {
-        @Bean
-        fun urlShortener(): UrlShortener = mock()
+    private lateinit var mockMvc: MockMvc
+    private lateinit var urlShortener: UrlShortener
+    private val mockGenerator: HashGenerator = mock()
+
+    @BeforeEach
+    fun setup() {
+        urlShortener = UrlShortenerImpl(mockGenerator)
+
+        mockMvc = MockMvcBuilders
+            .standaloneSetup(UrlShortenerController(urlShortener))
+            .build()
+
+        whenever(mockGenerator.encode("https://example.com")).thenReturn("abc123")
     }
 
     @Test
     fun `POST shortenUrl should return CREATED with short URL for valid URL`() {
         val originalUrl = "https://example.com"
         val shortUrl = "https://short.ly/abc123"
-
-        whenever(urlShortener.shorten(originalUrl)).thenReturn(shortUrl)
 
         mockMvc.perform(
             post("/api/shorten")
@@ -61,7 +64,7 @@ class UrlShortenerControllerTest(
         val shortUrl = "https://short.ly/abc123"
         val originalUrl = "https://example.com"
 
-        whenever(urlShortener.retrieve(shortUrl)).thenReturn(originalUrl)
+        urlShortener.shorten(originalUrl)
 
         mockMvc.perform(
             get("/api/retrieve")
@@ -72,10 +75,8 @@ class UrlShortenerControllerTest(
     }
 
     @Test
-    fun `GET retrieveUrl should return NOT_FOUND when short URL not found for valid URL`() {
+    fun `GET retrieveUrl should return NOT_FOUND when short URL not found`() {
         val shortUrl = "https://short.ly/unknown"
-
-        whenever(urlShortener.retrieve(shortUrl)).thenReturn(null)
 
         mockMvc.perform(
             get("/api/retrieve")

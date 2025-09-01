@@ -1,6 +1,7 @@
 package com.urlshortener.service
 
 import com.urlshortener.constants.Constants.DOMAIN
+import com.urlshortener.service.hashGenerator.HashGeneratorImpl
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -10,7 +11,7 @@ class UrlShortenerImplTest {
 
     @BeforeEach
     fun setUp() {
-        urlShortener = UrlShortenerImpl()
+        urlShortener = UrlShortenerImpl(HashGeneratorImpl())
     }
 
     @Test
