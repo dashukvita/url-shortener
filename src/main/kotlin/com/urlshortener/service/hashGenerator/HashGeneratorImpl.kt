@@ -12,6 +12,11 @@ import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.security.SecureRandom
 
+/**
+ * Generates short hash codes for URLs using SHA-256 + Base62 and ensures uniqueness.
+ * Retries with random byte changes up to MAX_ATTEMPTS if collisions occur.
+ */
+
 @Service
 class HashGeneratorImpl(
     private val cache: CacheRepository<String, String>,
