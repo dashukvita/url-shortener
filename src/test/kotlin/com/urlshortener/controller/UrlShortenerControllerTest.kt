@@ -28,7 +28,7 @@ class UrlShortenerControllerTest(
     }
 
     @Test
-    fun `POST shortenUrl should return CREATED with short URL`() {
+    fun `POST shortenUrl should return CREATED with short URL for valid URL`() {
         val originalUrl = "https://example.com"
         val shortUrl = "https://short.ly/abc123"
 
@@ -44,7 +44,20 @@ class UrlShortenerControllerTest(
     }
 
     @Test
-    fun `GET retrieveUrl should return original URL when found`() {
+    fun `POST shortenUrl should return BAD_REQUEST for invalid URL`() {
+        val invalidUrl = "invalid-url"
+
+        mockMvc.perform(
+            post("/api/shorten")
+                .contentType(MediaType.TEXT_PLAIN)
+                .content(invalidUrl)
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(content().string("Invalid url:$invalidUrl"))
+    }
+
+    @Test
+    fun `GET retrieveUrl should return original URL when found for valid URL`() {
         val shortUrl = "https://short.ly/abc123"
         val originalUrl = "https://example.com"
 
@@ -59,7 +72,7 @@ class UrlShortenerControllerTest(
     }
 
     @Test
-    fun `GET retrieveUrl should return NOT_FOUND when short URL not found`() {
+    fun `GET retrieveUrl should return NOT_FOUND when short URL not found for valid URL`() {
         val shortUrl = "https://short.ly/unknown"
 
         whenever(urlShortener.retrieve(shortUrl)).thenReturn(null)
@@ -70,5 +83,17 @@ class UrlShortenerControllerTest(
         )
             .andExpect(status().isNotFound)
             .andExpect(content().string("Short URL not found"))
+    }
+
+    @Test
+    fun `GET retrieveUrl should return BAD_REQUEST when short URL has invalid domain`() {
+        val invalidShortUrl = "https://wrong.ly/abc123"
+
+        mockMvc.perform(
+            get("/api/retrieve")
+                .param("shortUrl", invalidShortUrl)
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(content().string("Invalid url:$invalidShortUrl"))
     }
 }
