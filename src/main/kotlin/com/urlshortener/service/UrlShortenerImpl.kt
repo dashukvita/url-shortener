@@ -14,6 +14,11 @@ class UrlShortenerImpl(
     val storageRepository: StorageRepository
 ) : UrlShortener {
 
+    /**
+     * Shortens a long URL.
+     * @param originalUrl original URL
+     * @return shortened URL with domain
+     */
     @Loggable
     override fun shorten(originalUrl: String): String {
         val existingDoc = storageRepository.findUrlDocumentByLongUrl(originalUrl)
@@ -32,6 +37,11 @@ class UrlShortenerImpl(
         return DOMAIN + shortCode
     }
 
+    /**
+     * Retrieves the original URL from the shortened one.
+     * @param shortUrl shortened URL
+     * @return Optional with the original URL or empty
+     */
     @Loggable
     override fun retrieve(shortUrl: String): String? {
         val shortCode = shortUrl.removePrefix(DOMAIN)
