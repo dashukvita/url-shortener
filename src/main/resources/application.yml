@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: urlshortener
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,loggers
+
+logging:
+  level:
+    root: INFO
+    com.urlshortener: DEBUG
