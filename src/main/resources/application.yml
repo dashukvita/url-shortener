@@ -2,6 +2,10 @@ spring:
   application:
     name: urlshortener
 
+  data:
+    mongodb:
+      uri: mongodb://admin:secret@localhost:27017/library?authSource=admin
+
 management:
   endpoints:
     web:

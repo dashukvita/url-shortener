@@ -1,5 +1,7 @@
 package com.urlshortener.controller
 
+import com.urlshortener.model.UrlDocument
+import com.urlshortener.repository.StorageRepository
 import com.urlshortener.service.UrlShortener
 import com.urlshortener.service.UrlShortenerImpl
 import com.urlshortener.service.hashGenerator.HashGenerator
@@ -14,16 +16,21 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
 
 class UrlShortenerControllerTest {
 
     private lateinit var mockMvc: MockMvc
     private lateinit var urlShortener: UrlShortener
     private val mockGenerator: HashGenerator = mock()
+    private val mockStorage: StorageRepository = mock()
 
     @BeforeEach
     fun setup() {
-        urlShortener = UrlShortenerImpl(mockGenerator)
+        urlShortener = UrlShortenerImpl(
+            generator = mockGenerator,
+            storageRepository = mockStorage
+        )
 
         mockMvc = MockMvcBuilders
             .standaloneSetup(UrlShortenerController(urlShortener))
@@ -35,7 +42,12 @@ class UrlShortenerControllerTest {
     @Test
     fun `POST shortenUrl should return CREATED with short URL for valid URL`() {
         val originalUrl = "https://example.com"
-        val shortUrl = "https://short.ly/abc123"
+        val shortCode = "abc123"
+        val shortUrl = "https://short.ly/$shortCode"
+
+        whenever(mockStorage.findUrlDocumentByLongUrl(originalUrl)).thenReturn(null)
+        whenever(mockStorage.save(UrlDocument(shortUrl = shortCode, longUrl = originalUrl, createdAt = Instant.now())))
+            .thenAnswer {}
 
         mockMvc.perform(
             post("/api/shorten")
@@ -61,10 +73,12 @@ class UrlShortenerControllerTest {
 
     @Test
     fun `GET retrieveUrl should return original URL when found for valid URL`() {
-        val shortUrl = "https://short.ly/abc123"
+        val shortCode = "abc123"
+        val shortUrl = "https://short.ly/$shortCode"
         val originalUrl = "https://example.com"
 
-        urlShortener.shorten(originalUrl)
+        whenever(mockStorage.findUrlDocumentByShortUrl(shortCode))
+            .thenReturn(UrlDocument(shortUrl = shortCode, longUrl = originalUrl, createdAt = Instant.now()))
 
         mockMvc.perform(
             get("/api/retrieve")
@@ -77,6 +91,9 @@ class UrlShortenerControllerTest {
     @Test
     fun `GET retrieveUrl should return NOT_FOUND when short URL not found`() {
         val shortUrl = "https://short.ly/unknown"
+        val shortCode = "unknown"
+
+        whenever(mockStorage.findUrlDocumentByShortUrl(shortCode)).thenReturn(null)
 
         mockMvc.perform(
             get("/api/retrieve")
