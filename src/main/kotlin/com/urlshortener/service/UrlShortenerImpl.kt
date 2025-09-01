@@ -1,5 +1,6 @@
 package com.urlshortener.service
 
+import com.urlshortener.aspect.Loggable
 import com.urlshortener.constants.Constants.DOMAIN
 import com.urlshortener.model.UrlDocument
 import com.urlshortener.repository.StorageRepository
@@ -13,6 +14,7 @@ class UrlShortenerImpl(
     val storageRepository: StorageRepository
 ) : UrlShortener {
 
+    @Loggable
     override fun shorten(originalUrl: String): String {
         val existingDoc = storageRepository.findUrlDocumentByLongUrl(originalUrl)
         if (existingDoc != null) {
@@ -30,6 +32,7 @@ class UrlShortenerImpl(
         return DOMAIN + shortCode
     }
 
+    @Loggable
     override fun retrieve(shortUrl: String): String? {
         val shortCode = shortUrl.removePrefix(DOMAIN)
         val doc = storageRepository.findUrlDocumentByShortUrl(shortCode)
