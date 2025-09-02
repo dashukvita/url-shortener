@@ -1,5 +1,6 @@
 package com.urlshortener.service
 
+import com.mongodb.DuplicateKeyException
 import com.urlshortener.aspect.Loggable
 import com.urlshortener.constants.Constants.DOMAIN
 import com.urlshortener.constants.Constants.TTL
@@ -35,9 +36,14 @@ class UrlShortenerImpl(
             longUrl = originalUrl,
             createdAt = Instant.now()
         )
-        storageRepository.save(doc)
-        cacheRepository.save(shortCode, originalUrl, TTL)
+        try {
+            storageRepository.save(doc)
+        } catch (e: DuplicateKeyException) {
+            val existingDoc = storageRepository.findUrlDocumentByLongUrl(originalUrl)
+            return DOMAIN + existingDoc!!.shortUrl
+        }
 
+        cacheRepository.save(shortCode, originalUrl, TTL)
         return DOMAIN + shortCode
     }
 
